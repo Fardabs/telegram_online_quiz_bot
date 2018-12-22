@@ -1,5 +1,9 @@
+#-*. coding: utf:8 -*-
+import sys
+import time
 import requests
 import pymongo
+from pymongo import *
 
 #setting the database pre-prerequirements
 class database_communication():
@@ -8,7 +12,7 @@ class database_communication():
     'password' : '37788570b',
     'host' : 'ds121624.mlab.com',
     'port': 21624,
-    'namespace' = 'users'
+    'namespace' : 'users'
     }
 
     #the request that should be made to connect to our mongo database
@@ -22,5 +26,13 @@ class database_communication():
 
     #a function for saving datas in database
 
-    def savetodb(user):
-        db.members.insert(user)
+    #a function as a class constructor
+    def __init__(self,connection_params,connection,db):
+        self.connection_params = connection_params
+        self.connection = connection
+        self.db = db
+
+
+    @classmethod
+    def save_to_db(cls,user):
+        cls.db.members.insert(user)

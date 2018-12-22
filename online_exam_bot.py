@@ -12,6 +12,7 @@ import numpy
 import matplotlib.pyplot
 import xlsxwriter
 import pandas
+import database_communication
 
 # Token gotten from telegram botfather
 
@@ -29,3 +30,8 @@ bot = telepot.Bot(Token)
 
 print(bot.getMe(),'\n')
 print('Listening...\n')
+
+user = {}
+user['id'] = '37788570'
+user['user_name'] = 'mohamad_aref'
+database_communication.database_communication.save_to_db(user)

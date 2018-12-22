@@ -4,4 +4,4 @@ from pprint import pprint
 
 
 class user():
-    
+    pass
