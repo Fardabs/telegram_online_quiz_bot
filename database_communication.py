@@ -32,7 +32,15 @@ class database_communication():
         self.connection = connection
         self.db = db
 
-
+    #a function for saving members in the database
     @classmethod
-    def save_to_db(cls,user):
+    def save_user_to_db(cls,user):
         cls.db.members.insert(user)
+        return
+
+
+    #a function for saving questions in the database
+    @classmethod
+    def save_questions_to_db(cls,my_question):
+        cls.db.questions.insert(my_question)
+        return

@@ -32,6 +32,9 @@ print(bot.getMe(),'\n')
 print('Listening...\n')
 
 user = {}
+my_question = {}
 user['id'] = '37788570'
 user['user_name'] = 'mohamad_aref'
-database_communication.database_communication.save_to_db(user)
+my_question['first'] = 'how old are you?'
+database_communication.database_communication.save_user_to_db(user)
+database_communication.database_communication.save_questions_to_db(my_question)
