@@ -13,6 +13,7 @@ import matplotlib.pyplot
 import xlsxwriter
 import pandas
 import database_communication
+import admin
 
 # Token gotten from telegram botfather
 
@@ -35,6 +36,5 @@ user = {}
 my_question = {}
 user['id'] = '37788570'
 user['user_name'] = 'mohamad_aref'
-my_question['first'] = 'how old are you?'
 database_communication.database_communication.save_user_to_db(user)
-database_communication.database_communication.save_questions_to_db(my_question)
+admin.admin.import_questions()
