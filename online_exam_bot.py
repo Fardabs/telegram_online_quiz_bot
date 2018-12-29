@@ -34,7 +34,10 @@ print('Listening...\n')
 
 user = {}
 my_question = {}
+collection = "members"
+searched = {'id' : '37788570'}
 user['id'] = '37788570'
 user['user_name'] = 'mohamad_aref'
 database_communication.database_communication.save_user_to_db(user)
 admin.admin.import_questions()
+database_communication.database_communication.read_from_db(collection,searched)

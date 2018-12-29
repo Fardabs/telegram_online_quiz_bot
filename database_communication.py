@@ -4,6 +4,7 @@ import time
 import requests
 import pymongo
 from pymongo import *
+import pprint
 
 #setting the database pre-prerequirements
 class database_communication():
@@ -24,13 +25,17 @@ class database_communication():
 
     db = connection.users
 
+
+    collection = ""
+
     #a function for saving datas in database
 
     #a function as a class constructor
-    def __init__(self,connection_params,connection,db):
+    def __init__(self,connection_params,connection,db,collection):
         self.connection_params = connection_params
         self.connection = connection
         self.db = db
+        self.collection = collection
 
     #a function for saving members in the database
     @classmethod
@@ -43,4 +48,13 @@ class database_communication():
     @classmethod
     def save_questions_to_db(cls,my_question):
         cls.db.questions.insert(my_question)
+        return
+
+    #a function for reading data from database
+    @classmethod
+    def read_from_db(cls,collection,searched):
+        if collection == "questions":
+            pprint.pprint(cls.db.questions.find_one(searched))
+        if collection == "members":
+            pprint.pprint(cls.db.members.find_one(searched))
         return
