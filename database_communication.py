@@ -6,6 +6,7 @@ import pymongo
 from pymongo import *
 import pprint
 
+
 #setting the database pre-prerequirements
 class database_communication():
     connection_params = {
@@ -54,7 +55,20 @@ class database_communication():
     @classmethod
     def read_from_db(cls,collection,searched):
         if collection == "questions":
-            pprint.pprint(cls.db.questions.find_one(searched))
+            pprint.pprint(searched)
+            searched = {"question":searched}
+            try:
+                for my_question in cls.db.questions.find(searched):
+                    pprint.pprint(my_question)
+                    return my_question
+            except:
+                print('Not found 404 :)))')
         if collection == "members":
-            pprint.pprint(cls.db.members.find_one(searched))
-        return
+            pprint.pprint(searched)
+            searched = {"user_name":searched}
+            try:
+                for user in cls.db.members.find(searched):
+                    pprint.pprint(user)
+                    return user
+            except:
+                print('Not found 404 :)))')

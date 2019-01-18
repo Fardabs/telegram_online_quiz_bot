@@ -14,6 +14,7 @@ import xlsxwriter
 import pandas
 import database_communication
 import admin
+import user
 
 # Token gotten from telegram botfather
 
@@ -32,12 +33,20 @@ bot = telepot.Bot(Token)
 print(bot.getMe(),'\n')
 print('Listening...\n')
 
-user = {}
+userss = {}
 my_question = {}
 collection = "members"
 searched = {'id' : '37788570'}
-user['id'] = '37788570'
-user['user_name'] = 'mohamad_aref'
-database_communication.database_communication.save_user_to_db(user)
+userss['id'] = '37788570'
+userss['user_name'] = 'mohamad_aref'
+userss['password'] = '37788570bb'
+try:
+    database_communication.database_communication.save_user_to_db(userss)
+except:
+    print("there is a repeated key!!!")
 admin.admin.import_questions()
 database_communication.database_communication.read_from_db(collection,searched)
+user_name = input('enter your username:')
+password = input('enter your password:')
+usr = user.user(user_name,password,score = 0)
+usr.sign_in()

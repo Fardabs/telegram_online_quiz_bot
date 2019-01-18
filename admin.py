@@ -24,5 +24,9 @@ class admin():
             # print(my_question)
             col_num = 0
             row_num = row_num + 1
-            database_communication.database_communication.save_questions_to_db(my_question)
+            try:
+                database_communication.database_communication.save_questions_to_db(my_question)
+            except:
+                print("there is a repeated key!!!")
+
             del my_question
