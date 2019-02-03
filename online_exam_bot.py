@@ -3,6 +3,7 @@ import sys
 import time
 import datetime
 import telepot
+import telegram
 import requests
 import pymongo
 from telepot.loop import MessageLoop
@@ -15,6 +16,11 @@ import pandas
 import database_communication
 import admin
 import user
+from telegram import TelegramObject
+from random import randint
+import pprint
+import copy
+
 
 # Token gotten from telegram botfather
 
@@ -28,25 +34,75 @@ welcome_message = 'خوش آمدید'
 
 bot = telepot.Bot(Token)
 
+telegrambotapi  = telegram.Bot(token=Token)
+
+#a list for saving the subjects of quizes
+
+subjects = ['daily',
+            'psychology',
+            'sport',
+            'coocking',
+            'electrical_engineering',
+            ]
+
+my_user = user.user(user_name= '' , password=randint(100000000, 9999999999) , chat_id=0)
+
 #to understand that bot is working correctly
 
 print(bot.getMe(),'\n')
 print('Listening...\n')
 
-userss = {}
-my_question = {}
-collection = "members"
-searched = {'id' : '37788570'}
-userss['id'] = '37788570'
-userss['user_name'] = 'mohamad_aref'
-userss['password'] = '37788570bb'
-try:
-    database_communication.database_communication.save_user_to_db(userss)
-except:
-    print("there is a repeated key!!!")
-admin.admin.import_questions()
-database_communication.database_communication.read_from_db(collection,searched)
-user_name = input('enter your username:')
-password = input('enter your password:')
-usr = user.user(user_name,password,score = 0)
-usr.sign_in()
+def handle(msg):
+    global all_ques_of_type
+    global my_user
+    content_type, chat_type, chat_id = telepot.glance(msg)
+    print('Chat Message:', content_type, chat_type, chat_id)
+    # my_user = user.user(user_name= msg['chat']['username'] , password=randint(100000000, 9999999999) , chat_id=chat_id)
+
+    if(msg['text'] == '/admin'):
+        entry_user_pass(telegrambotapi,chat_id)
+        admin.admin.import_questions(telegrambotapi,chat_id)
+
+    if content_type == 'text':
+        my_admin = admin.admin()
+
+        if(msg['text'] != '/get_export'):
+            my_user = my_admin.display_questions_check_answers(telegrambotapi,chat_id,msg)
+
+            # print(my_user)
+
+        elif(msg['text'] == '/get_export'):
+            my_admin.get_export(my_user)
+            print('=+=+=+=+=+=+=+=+=+=+')
+
+
+
+
+
+
+########################################################################################
+########################################################################################
+def import_admin():                                                                   ##
+    userss['id'] = '37788570'                                                         ##
+    userss['user_name'] = 'mohamad_aref'                                              ##
+    userss['password'] = '37788570bb'                                                 ##
+    try:                                                                              ##
+        database_communication.database_communication.save_user_to_db(userss)         ##
+    except:                                                                           ##
+        print("there is a repeated key!!!")                                           ##
+########################################################################################
+########################################################################################
+
+
+def entry_user_pass(telegrambotapi,chat_id):
+    my_username = input('enter your username:')
+    my_password = input('enter your password:')
+    usr = user.user(my_username,my_password,score=0,chat_id = chat_id)
+    if(usr.sign_in(telegrambotapi,chat_id) == 0):
+        entry_user_pass(telegrambotapi,chat_id)
+
+
+MessageLoop(bot,handle).run_as_thread()
+
+while 1:
+    time.sleep(0.05)

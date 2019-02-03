@@ -56,7 +56,7 @@ class database_communication():
     def read_from_db(cls,collection,searched):
         if collection == "questions":
             pprint.pprint(searched)
-            searched = {"question":searched}
+
             try:
                 for my_question in cls.db.questions.find(searched):
                     pprint.pprint(my_question)
@@ -65,10 +65,16 @@ class database_communication():
                 print('Not found 404 :)))')
         if collection == "members":
             pprint.pprint(searched)
-            searched = {"user_name":searched}
+
             try:
                 for user in cls.db.members.find(searched):
                     pprint.pprint(user)
                     return user
             except:
                 print('Not found 404 :)))')
+
+    @classmethod
+    def count_entry(cls,collection,entry):
+        if collection == "questions":
+            num = cls.db.questions.count_documents(entry)
+            return num
