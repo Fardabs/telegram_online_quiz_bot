@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import numpy
 import xlsxwriter
 from pandas import read_excel
@@ -7,7 +8,7 @@ import pandas
 import database_communication
 import sys
 import telepot
-from telepot.namedtuple import ReplyKeyboardMarkup, KeyboardButton
+from telepot.namedtuple import ReplyKeyboardMarkup, KeyboardButton,InlineKeyboardMarkup,InlineKeyboardButton
 import time
 import re
 import requests
@@ -18,11 +19,10 @@ from xlrd import *
 import matplotlib.pyplot as plt
 import user
 from random import randint
-# from openpyxl import load_workbook
-# from PDFWriter import PDFWriter
-# from pylovepdf.ilovepdf import ILovePdf
+from threading import Timer
+import config
 
-time_limit = 5
+time_limit = int(config.conf['time_limit'])
 
 all_ques = []
 
@@ -36,7 +36,15 @@ my_TRUE = 0
 
 number_of_questions = 0
 
-my_user = user.user(user_name= '' , password=randint(100000000, 9999999999) , chat_id=0)
+users = {}
+
+done = 0
+
+start = 0
+
+subjects = {}
+
+# my_user = user.user(user_name= '' , password=randint(100000000, 9999999999) , chat_id=0)
 
 class admin():
 
@@ -83,11 +91,16 @@ class admin():
 
     @classmethod
     def display_questions_check_answers(cls,bot,chat_id,msg):
-        my_admin = admin()
+
+        global done
+
+        global start
 
         my_collection = "questions"
 
         global all_ques
+
+        global users
 
         global ques_num
 
@@ -97,96 +110,169 @@ class admin():
 
         global my_TRUE
 
-        global my_user
+        global subjects
 
-        subjects = {'daily' : 0,
-                    'psychology' : 1,
-                    'sport' : 2,
-                    'coocking' : 3,
-                    'electrical_engineering' : 4
-                    }
+        done = time.time()
+
+        elapsed = done - start
+
+        elapsed = int(elapsed)
 
         if (msg['text'] == '/start'):
+            users[ msg['chat']['id'] ]  = {}
             pprint.pprint(msg)
             my_user = user.user(user_name= msg['chat']['first_name'] , password=randint(100000000, 9999999999) , chat_id=chat_id)
 
-            subjects = {'daily' : 0,
-                        'psychology' : 1,
-                        'sport' : 2,
-                        'coocking' : 3,
-                        'electrical_engineering' : 4
-                        }
+            for num in range(0,len(cls.sheet_names)):
+                subjects[cls.sheet_names[num]] = str(num)
 
             my_keyboard = []
-
+            pprint.pprint(subjects)
             for keys in subjects:
                 my_keyboard.append([KeyboardButton(text = keys)])
 
             print(my_keyboard)
+
+            bot.sendMessage(chat_id = chat_id,text = 'time for answering each question is : ' + str(time_limit) + ' sec')
 
             bot.sendMessage(chat_id = chat_id,text = 'choose the topic of the exam',
                 reply_markup = ReplyKeyboardMarkup(
                 keyboard = my_keyboard
                 ))
         elif (msg['text'] in subjects.keys()):
-            my_entry = {'category' : msg['text']}
-            global number_of_questions
-            number_of_questions = database_communication.database_communication.count_entry(my_collection,my_entry)
-            print(number_of_questions)
-            #quesring questions from data base and showing chices to the user
-            for num in range(1,number_of_questions+1):
-                #quesring on data base ,based on the question number
-                my_entry = {'category' : msg['text'] , 'NO' : str(float(num))}
+            try:
+                existed_member = database_communication.database_communication.read_from_db("members",{'chat_id': msg['chat']['id']})
+                #this condition below checks if the user has ever participated in this category of exam or not if he hasn't participated the users dictionary will be initialized and the first question will come up
+                if msg['text'] not in existed_member['category'].keys():
+                    users[ msg['chat']['id'] ] ['cat'] = msg['text']
+                    users[ msg['chat']['id'] ] ['qnum'] = 1
+                    users[ msg['chat']['id'] ] ['score'] = 0
+                    users[ msg['chat']['id'] ] ['true'] = 0
+                    users[ msg['chat']['id'] ] ['false'] = 0
+                    users[ msg['chat']['id'] ] ['flag'] = 0
+                    print('|##|$|$|$|#|$|#|$|#|$|#$|#')
+                    prevques = database_communication.database_communication.read_from_db("questions",{'category' : users[ msg['chat']['id'] ] ['cat'] , 'NO' : str(float(users[ msg['chat']['id'] ] ['qnum'])) })
+                    try:
+                        #using a regex in order to define choices that contain url addresses
+                        item  = re.findall("http+.*",prevques['choice1'])
+                    except:
+                        print('exam is finished!')
+                    if (prevques['choice1'] != 'none' and not item):
 
-                ques = database_communication.database_communication.read_from_db("questions",my_entry)
+                        bot.sendMessage(chat_id = chat_id,text = str(prevques['question']),
+                        reply_markup = ReplyKeyboardMarkup(
+                        keyboard = [[KeyboardButton(text = prevques['choice1']),
+                            KeyboardButton(text = prevques['choice2'])],[
+                            KeyboardButton(text = prevques['choice3']),
+                            KeyboardButton(text = prevques['choice4'])]]
+                            ))
 
-                all_ques.append(ques)
+                        if (prevques['image'] != 'none'):
+                            bot.send_photo(chat_id=chat_id, photo=prevques['image'])
 
-                pprint.pprint(all_ques)
+                        start = time.time()
 
-                print('******************')
-                pprint.pprint(ques)
-                print('+++++++++---------')
-                #using a regex in order to define choices that contain url addresses
-                item  = re.findall("http+.*",ques['choice1'])
+                        time.sleep(time_limit)
 
-                if (ques['choice1'] != 'none' and not item):
+                        bot.sendMessage(chat_id,text = emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True) + 'Time finished' + emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True),reply_markup = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text = 'CONTINUE EXAM')]]))
 
-                    bot.sendMessage(chat_id = chat_id,text = str(ques['question']),
+                    elif (prevques['choice1'] == 'none'):
+
+                        bot.sendMessage(chat_id = chat_id,text = str(prevques['question']))
+
+                        if (prevques['image'] != 'none'):
+                            bot.send_photo(chat_id=chat_id, photo=prevques['image'])
+
+                        bot.sendMessage(chat_id = chat_id,text = "type your answer:" + emojize(":point_down:", use_aliases=True))
+
+                        start = time.time()
+
+                        time.sleep(time_limit)
+
+                        bot.sendMessage(chat_id,text = emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True) + 'Time finished' + emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True),reply_markup = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text = 'CONTINUE EXAM')]]))
+
+
+                    elif (item):
+
+                        bot.sendMessage(chat_id,str(prevques['question']) + emojize(":point_down:", use_aliases=True),
+                        reply_markup = ReplyKeyboardMarkup(
+                        keyboard = [[KeyboardButton(text = str(float(1))),
+                            KeyboardButton(text = str(float(2)))],[
+                            KeyboardButton(text = str(float(3))),
+                            KeyboardButton(text = str(float(4)))]]
+                            ))
+
+                        if (prevques['image'] != 'none'):
+                            bot.send_photo(chat_id=chat_id, photo=prevques['image'])
+
+                        for i in range(1,5):
+                            image = requests.post(prevques['choice'+str(i)])
+                            bot.sendMessage(chat_id = chat_id , text = 'image number' + str(i) + emojize(":point_down:", use_aliases=True))
+                            bot.send_photo(chat_id=chat_id, photo=prevques['choice'+str(i)])
+
+
+
+                        start = time.time()
+
+                        time.sleep(time_limit)
+
+                        bot.sendMessage(chat_id,text = emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True) + 'Time finished' + emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True),reply_markup = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text = 'CONTINUE EXAM')]]))
+
+                else:
+                    bot.sendMessage(chat_id = chat_id,text = "Sorry to say that but you've once participated in this category of exam!!" + emojize(":pensive:", use_aliases=True) + emojize(":pensive:", use_aliases=True) + emojize(":pensive:", use_aliases=True) ,reply_markup = ReplyKeyboardRemove(selective=True))
+
+            except:
+                users[ msg['chat']['id'] ] ['cat'] = msg['text']
+                users[ msg['chat']['id'] ] ['qnum'] = 1
+                users[ msg['chat']['id'] ] ['score'] = 0
+                users[ msg['chat']['id'] ] ['true'] = 0
+                users[ msg['chat']['id'] ] ['false'] = 0
+                users[ msg['chat']['id'] ] ['flag'] = 0
+                print('|##|$|$|$|#|$|#|$|#|$|#$|#')
+                prevques = database_communication.database_communication.read_from_db("questions",{'category' : users[ msg['chat']['id'] ] ['cat'] , 'NO' : str(float(users[ msg['chat']['id'] ] ['qnum'])) })
+                try:
+                    #using a regex in order to define choices that contain url addresses
+                    item  = re.findall("http+.*",prevques['choice1'])
+                except:
+                    print('exam is finished!')
+                if (prevques['choice1'] != 'none' and not item):
+
+                    bot.sendMessage(chat_id = chat_id,text = str(prevques['question']),
                     reply_markup = ReplyKeyboardMarkup(
-                    keyboard = [[KeyboardButton(text = ques['choice1']),
-                        KeyboardButton(text = ques['choice2'])],[
-                        KeyboardButton(text = ques['choice3']),
-                        KeyboardButton(text = ques['choice4'])]]
+                    keyboard = [[KeyboardButton(text = prevques['choice1']),
+                        KeyboardButton(text = prevques['choice2'])],[
+                        KeyboardButton(text = prevques['choice3']),
+                        KeyboardButton(text = prevques['choice4'])]]
                         ))
 
-                    if (ques['image'] != 'none'):
-                        bot.send_photo(chat_id=chat_id, photo=ques['image'])
+                    if (prevques['image'] != 'none'):
+                        bot.send_photo(chat_id=chat_id, photo=prevques['image'])
+
+                    start = time.time()
 
                     time.sleep(time_limit)
-                    print('###################')
-                    pprint.pprint(msg['text'])
-                    print('###################')
-                    bot.sendMessage(chat_id,text = emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True) + 'Time finished' + emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True),reply_markup = ReplyKeyboardRemove(selective=True))
 
-                elif (ques['choice1'] == 'none'):
+                    bot.sendMessage(chat_id,text = emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True) + 'Time finished' + emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True),reply_markup = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text = 'CONTINUE EXAM')]]))
 
-                    bot.sendMessage(chat_id = chat_id,text = str(ques['question']))
+                elif (prevques['choice1'] == 'none'):
 
-                    if (ques['image'] != 'none'):
-                        bot.send_photo(chat_id=chat_id, photo=ques['image'])
+                    bot.sendMessage(chat_id = chat_id,text = str(prevques['question']))
+
+                    if (prevques['image'] != 'none'):
+                        bot.send_photo(chat_id=chat_id, photo=prevques['image'])
 
                     bot.sendMessage(chat_id = chat_id,text = "type your answer:" + emojize(":point_down:", use_aliases=True))
 
+                    start = time.time()
+
                     time.sleep(time_limit)
-                    print('###################')
-                    pprint.pprint(msg['text'])
-                    print('###################')
-                    bot.sendMessage(chat_id,text = emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True) + 'Time finished' + emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True),reply_markup = ReplyKeyboardRemove(selective=True))
+
+                    bot.sendMessage(chat_id,text = emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True) + 'Time finished' + emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True),reply_markup = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text = 'CONTINUE EXAM')]]))
+
 
                 elif (item):
 
-                    bot.sendMessage(chat_id,str(ques['question']) + emojize(":point_down:", use_aliases=True),
+                    bot.sendMessage(chat_id,str(prevques['question']) + emojize(":point_down:", use_aliases=True),
                     reply_markup = ReplyKeyboardMarkup(
                     keyboard = [[KeyboardButton(text = str(float(1))),
                         KeyboardButton(text = str(float(2)))],[
@@ -194,72 +280,243 @@ class admin():
                         KeyboardButton(text = str(float(4)))]]
                         ))
 
-                    if (ques['image'] != 'none'):
-                        bot.send_photo(chat_id=chat_id, photo=ques['image'])
+                    if (prevques['image'] != 'none'):
+                        bot.send_photo(chat_id=chat_id, photo=prevques['image'])
 
                     for i in range(1,5):
-                        image = requests.post(ques['choice'+str(i)])
+                        image = requests.post(prevques['choice'+str(i)])
                         bot.sendMessage(chat_id = chat_id , text = 'image number' + str(i) + emojize(":point_down:", use_aliases=True))
-                        bot.send_photo(chat_id=chat_id, photo=ques['choice'+str(i)])
+                        bot.send_photo(chat_id=chat_id, photo=prevques['choice'+str(i)])
 
 
+
+                    start = time.time()
 
                     time.sleep(time_limit)
-                    print('###################')
-                    pprint.pprint(msg['text'])
-                    print('###################')
-                    bot.sendMessage(chat_id,text = emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True) + 'Time finished' + emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True),reply_markup = ReplyKeyboardRemove(selective=True))
 
-                ##############################################################################################
+                    bot.sendMessage(chat_id,text = emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True) + 'Time finished' + emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True),reply_markup = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text = 'CONTINUE EXAM')]]))
 
-            bot.sendMessage(chat_id,text = 'thank you for taking part in our exam' + emojize(":heart_eyes:", use_aliases=True)+ emojize(" :heart_eyes:", use_aliases=True)+ emojize(" :heart_eyes:", use_aliases=True))
-        elif(msg['text'] != '/get_export'):
-            print('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
-            pprint.pprint(msg['text'])
-            # print(str(all_ques[ques_num]['answer']))
-            if(msg['text'] == all_ques[ques_num]['answer']):
-                my_score = my_score + 3
-                my_TRUE = my_TRUE + 1
-            else:
-                my_score = my_score - 1
-                my_FALSE = my_FALSE + 1
+            ##############################################################################################
 
-            ques_num = ques_num + 1
+        #this condition is just used for debugging
+        elif(msg['text'] == '/all_users'):
+            pprint.pprint(users)
 
-            my_user.set_score(my_score)
-            my_user.set_TRUE(my_TRUE)
-            my_user.set_FALSE(my_FALSE)
+        elif(msg['text'] != '/start' or msg['text'] != '/all_users' or msg['text'] not in subjects.keys() or msg['text'] != '/admin' or msg['text'] != 'CONTINUE EXAM') :
+            global number_of_questions
+            number_of_questions = database_communication.database_communication.count_entry(my_collection,{ "category" : users[ msg['chat']['id'] ] ['cat']})
 
-            print(my_user.user_name,': his score : -------->>>>>>>>>>>>>>>>>>>>>',my_user.score,'<<<<<<<<<<<<<<<<----------')
-            print('..............',my_user.FALSE,'................')
-            print('..............',my_user.TRUE,'................')
-            # print('..............',my_user.NOT_ANSWERED,'................')
-            print(my_user)
-            return my_user
+            #quesring questions from data base and showing chices to the user
+            #quesring on data base ,based on the question number
+            if(users[ msg['chat']['id'] ] ['qnum'] < number_of_questions + 1):
+                print('{{{{{{{{{{{{{{{{{{{@@@@@@@@@@@@@@}}}}}}}}}}}}}}}}}}}')
+                print('flag : ' + str(users[ msg['chat']['id'] ] ['flag']))
+                print('msg : ' + str(msg['text']))
+                print('{{{{{{{{{{{{{{{{{{{@@@@@@@@@@@@@@}}}}}}}}}}}}}}}}}}}')
+
+                prevques = database_communication.database_communication.read_from_db("questions",{'category' : users[ msg['chat']['id'] ] ['cat'] , 'NO' : str(float(users[ msg['chat']['id'] ] ['qnum'])) })
+                nextques = database_communication.database_communication.read_from_db("questions",{'category' : users[ msg['chat']['id'] ] ['cat'] , 'NO' : str(float(users[ msg['chat']['id'] ] ['qnum']+1)) })
+                # if users[ msg['chat']['id'] ] ['flag'] == 0:
+                #
+                #     users[ msg['chat']['id'] ] ['flag'] = 1
+                #
+                #     users[ msg['chat']['id'] ] ['qnum'] += 1
+
+                if(elapsed <= time_limit):
+                    if(msg['text'] == prevques['answer']):
+                        pprint.pprint('^^^^^^^^^^^^^^^^^^^^^')
+                        users[ msg['chat']['id'] ] ['score'] = users[ msg['chat']['id'] ] ['score'] + 3
+                        users[ msg['chat']['id'] ] ['true'] = users[ msg['chat']['id'] ] ['true'] + 1
+
+                    else:
+                        pprint.pprint('^@^@^@^@^@^@^@^@^@^@^@^@')
+                        users[ msg['chat']['id'] ] ['score'] = users[ msg['chat']['id'] ] ['score'] - 1
+                        users[ msg['chat']['id'] ] ['false'] = users[ msg['chat']['id'] ] ['false'] + 1
+
+                else:
+                    bot.sendMessage(chat_id=chat_id,text = 'time for answering this question is finished' + emojize(":sob:", use_aliases=True) + emojize(":sob:", use_aliases=True) + emojize(":sob:", use_aliases=True))
+
+
+                pprint.pprint(users[ msg['chat']['id'] ] ['score'])
+
+                if(users[ msg['chat']['id'] ] ['qnum'] != number_of_questions):
+                    try:
+                        #using a regex in order to define choices that contain url addresses
+                        item  = re.findall("http+.*",nextques['choice1'])
+                    except:
+                        print('exam is finished!')
+                    if (nextques['choice1'] != 'none' and not item):
+
+                        bot.sendMessage(chat_id = chat_id,text = str(nextques['question']),
+                        reply_markup = ReplyKeyboardMarkup(
+                        keyboard = [[KeyboardButton(text = nextques['choice1']),
+                            KeyboardButton(text = nextques['choice2'])],[
+                            KeyboardButton(text = nextques['choice3']),
+                            KeyboardButton(text = nextques['choice4'])]]
+                            ))
+
+                        if (nextques['image'] != 'none'):
+                            bot.send_photo(chat_id=chat_id, photo=nextques['image'])
+
+
+
+                        start = time.time()
+
+                        time.sleep(time_limit)
+
+                        print('###################')
+                        pprint.pprint(msg['text'])
+                        print('###################')
+                        bot.sendMessage(chat_id,text = emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True) + 'Time finished' + emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True),reply_markup = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text = 'CONTINUE EXAM')]]))
+
+
+                    elif (nextques['choice1'] == 'none'):
+
+                        bot.sendMessage(chat_id = chat_id,text = str(nextques['question']))
+
+                        if (nextques['image'] != 'none'):
+                            bot.send_photo(chat_id=chat_id, photo=nextques['image'])
+
+                        bot.sendMessage(chat_id = chat_id,text = "type your answer:" + emojize(":point_down:", use_aliases=True))
+
+
+
+                        start = time.time()
+
+                        time.sleep(time_limit)
+
+                        print('###################')
+                        pprint.pprint(msg['text'])
+                        print('###################')
+                        bot.sendMessage(chat_id,text = emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True) + 'Time finished' + emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True),reply_markup = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text = 'CONTINUE EXAM')]]))
+
+                    elif (item):
+
+                        bot.sendMessage(chat_id,str(nextques['question']) + emojize(":point_down:", use_aliases=True),
+                        reply_markup = ReplyKeyboardMarkup(
+                        keyboard = [[KeyboardButton(text = str(float(1))),
+                            KeyboardButton(text = str(float(2)))],[
+                            KeyboardButton(text = str(float(3))),
+                            KeyboardButton(text = str(float(4)))]]
+                            ))
+
+                        if (nextques['image'] != 'none'):
+                            bot.send_photo(chat_id=chat_id, photo=nextques['image'])
+
+
+                        for i in range(1,5):
+                            image = requests.post(nextques['choice'+str(i)])
+                            bot.sendMessage(chat_id = chat_id , text = 'image number' + str(i) + emojize(":point_down:", use_aliases=True))
+                            bot.send_photo(chat_id=chat_id, photo=nextques['choice'+str(i)])
+
+
+
+                        start = time.time()
+
+                        time.sleep(time_limit)
+
+                        print('###################')
+                        pprint.pprint(msg['text'])
+                        print('###################')
+                        bot.sendMessage(chat_id,text = emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True) + 'Time finished' + emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True),reply_markup = ReplyKeyboardMarkup(keyboard = [[KeyboardButton(text = 'CONTINUE EXAM')]]))
+
+                        # bot.sendMessage(chat_id,text = emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True) + 'Time finished' + emojize(":x:", use_aliases=True) + emojize(":x:", use_aliases=True),reply_markup = ReplyKeyboardRemove(selective=True))
+
+                    ##############################################################################################
+                # else:
+                #     bot.sendMessage(chat_id = chat_id , text = 'EXAM EXPIRED')
+
+                users[ msg['chat']['id'] ] ['qnum'] = users[ msg['chat']['id'] ] ['qnum'] + 1
+
+            if(users[ msg['chat']['id'] ] ['qnum'] == number_of_questions + 1):
+                bot.sendMessage(chat_id,text = 'thank you for taking part in our exam' + emojize(":heart_eyes:", use_aliases=True)+ emojize(" :heart_eyes:", use_aliases=True)+ emojize(" :heart_eyes:", use_aliases=True),reply_markup = ReplyKeyboardRemove(selective=True))
+                bot.sendMessage(chat_id,text = 'your score is : ' + str(users[ msg['chat']['id'] ] ['score']) + '/' + str(number_of_questions * 3))
+                users[ msg['chat']['id'] ] ['qnum'] = users[ msg['chat']['id'] ] ['qnum'] + 1
+                my_user = user.user(user_name= msg['chat']['first_name'] , password=randint(100000000, 9999999999) , chat_id=chat_id)
+
+                my_saved_user = {}
+
+                my_saved_user['category'] = {}
+
+                my_saved_user['category'][users[ msg['chat']['id'] ] ['cat']] = {}
+
+                NOT_ANSWERED = number_of_questions - (users[ msg['chat']['id'] ] ['false'] + users[ msg['chat']['id'] ] ['true'])
+
+                my_saved_user['category'][users[ msg['chat']['id'] ] ['cat']] = {}
+
+                my_saved_user['user_name']  = my_user.user_name
+                my_saved_user['password'] = my_user.password
+                my_saved_user['category'][users[ msg['chat']['id'] ] ['cat']]['SCORE'] =  users[ msg['chat']['id'] ] ['score']
+                my_saved_user['category'][users[ msg['chat']['id'] ] ['cat']]['TRUE'] = users[ msg['chat']['id'] ] ['true']
+                my_saved_user['category'][users[ msg['chat']['id'] ] ['cat']]['FALSE'] = users[ msg['chat']['id'] ] ['false']
+                my_saved_user['category'][users[ msg['chat']['id'] ] ['cat']]['NOT_ANSWERED'] = NOT_ANSWERED
+                my_saved_user['chat_id'] = msg['chat']['id']
+
+                try:
+                    database_communication.database_communication.save_user_to_db(my_saved_user)
+                except:
+                    print('there is a repeated key!!!')
+
+                    existed_member = database_communication.database_communication.read_from_db("members",{'chat_id': my_saved_user['chat_id']})
+
+                    if users[ msg['chat']['id'] ] ['cat'] not in existed_member['category'].keys():
+
+                        myquery = {}
+
+                        newvalues = {}
+
+                        newvalues['category'] = {}
+
+                        myquery['chat_id'] = my_saved_user['chat_id']
+
+                        newvalues['category'] = existed_member['category']
+                        print('|||||||||||||||||||||||||||||||||')
+                        pprint.pprint(newvalues['category'])
+                        print('|||||||||||||||||||||||||||||||||')
+                        newvalues['category'][users[ msg['chat']['id'] ] ['cat']] = {'SCORE':users[ msg['chat']['id'] ] ['score'] , 'TRUE':users[ msg['chat']['id'] ] ['true'] , 'FALSE' : users[ msg['chat']['id'] ] ['false'] , 'NOT_ANSWERED' : NOT_ANSWERED}
+
+                        database_communication.database_communication.update(newvalues,myquery)
+
+                return users[ msg['chat']['id'] ]
+
+            # users[ msg['chat']['id'] ] ['qnum'] = users[ msg['chat']['id'] ] ['qnum'] + 1
+
+
 
 
 
     @classmethod
-    def get_export(cls,my_user):
+    def get_export(cls,bot,msg,chat_id,my_user):
 
-        my_saved_user = {}
+        global users
+
+        existed_member = database_communication.database_communication.read_from_db("members",{'chat_id': msg['chat']['id']})
+
+        my_keyboard = []
+
+        for button in existed_member['category'].keys():
+            my_keyboard.append([InlineKeyboardButton(text=button, callback_data=button)])
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard = my_keyboard)
+
+        bot.sendMessage(chat_id, 'Choose desired bilan', reply_markup=keyboard)
+
+    @classmethod
+    def calculate(cls,bot,msg,chat_id,desired):
 
         labels = 'TRUE', 'FALSE', 'NA'
 
-        my_user.NOT_ANSWERED = number_of_questions - (my_user.FALSE + my_user.TRUE)
+        DESIRED_user = {}
 
-        my_saved_user['user_name']  = my_user.user_name
-        my_saved_user['password'] = my_user.password
-        my_saved_user['score'] = my_user.score
-        my_saved_user['chat_id'] = my_user.chat_id
-        my_saved_user['TRUE'] = my_user.TRUE
-        my_saved_user['FALSE'] = my_user.FALSE
-        my_saved_user['NOT_ANSWERED'] = my_user.NOT_ANSWERED
-        try:
-            database_communication.database_communication.save_user_to_db(my_saved_user)
-        except:
-            print('there is a repeated key!!!')
-        sizes = [my_user.TRUE, my_user.FALSE, my_user.NOT_ANSWERED]
+        DESIRED_user [ chat_id ] = database_communication.database_communication.read_from_db("members",{'chat_id': chat_id})
+
+        DESIRED_user [ chat_id ] [ 'TRUE_num' ] = DESIRED_user [ chat_id ] ['category'][desired]['TRUE']
+
+        DESIRED_user [ chat_id ] [ 'FALSE_num' ] = DESIRED_user [ chat_id ] ['category'][desired]['FALSE']
+
+        DESIRED_user [ chat_id ] [ 'NOT_ANSWERED_num' ] = DESIRED_user [ chat_id ] ['category'][desired]['NOT_ANSWERED']
+
+        sizes = [DESIRED_user [ chat_id ] [ 'TRUE_num' ], DESIRED_user [ chat_id ] [ 'FALSE_num' ], DESIRED_user [ chat_id ] [ 'NOT_ANSWERED_num' ]]
 
         explode = (0.1, 0, 0)
 
@@ -269,4 +526,10 @@ class admin():
 
         ax1.axis('equal')
 
-        plt.show()
+        plt.savefig('./diagrams/result.png')
+
+        bot.send_photo(chat_id=chat_id,photo=open('./diagrams/result.png' , 'rb'))
+
+        bot.sendMessage(chat_id=chat_id,text='GREEN : NOT_ANSWERED\n\nORANGE : FALSE\n\nBLUE :‌ TRUE\n\n')
+
+        os.remove("./diagrams/result.png")

@@ -1,0 +1,7 @@
+my_saved_user['user_name']  = my_user.user_name
+        my_saved_user['password'] = my_user.password
+        my_saved_user['category'] = { users[ msg['chat']['id'] ] ['cat'] : users[ msg['chat']['id'] ] ['score'] }
+        my_saved_user['chat_id'] = msg['chat']['id']
+        my_saved_user['TRUE'] = users[ msg['chat']['id'] ] ['true']
+        my_saved_user['FALSE'] = users[ msg['chat']['id'] ] ['false']
+        my_saved_user['NOT_ANSWERED'] = NOT_ANSWERED

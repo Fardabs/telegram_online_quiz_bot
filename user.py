@@ -36,10 +36,6 @@ class user():
     @classmethod
     def sign_in(cls,bot,chat_id):
         user_info = {}
-        # pprint.pprint("***************")
-        # pprint.pprint(database_communication.database_communication.read_from_db("members",cls.user_name))
-        # pprint.pprint("***************")
-        # print(type(database_communication.database_communication.read_from_db("members",cls.user_name)))
         user_info = database_communication.database_communication.read_from_db("members",{'user_name' : cls.user_name})
         pprint.pprint(type(user_info))
         if(str(type(user_info)) != "<class 'NoneType'>"):

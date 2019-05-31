@@ -20,11 +20,13 @@ from telegram import TelegramObject
 from random import randint
 import pprint
 import copy
+from threading import Timer
+import config
 
 
 # Token gotten from telegram botfather
 
-Token = '722321256:AAHZYQTTVlopUXAuTQTIHVvjKa5iIbLZ5fQ'
+Token = config.conf['Token']
 
 # Welcome Message
 
@@ -36,15 +38,6 @@ bot = telepot.Bot(Token)
 
 telegrambotapi  = telegram.Bot(token=Token)
 
-#a list for saving the subjects of quizes
-
-subjects = ['daily',
-            'psychology',
-            'sport',
-            'coocking',
-            'electrical_engineering',
-            ]
-
 my_user = user.user(user_name= '' , password=randint(100000000, 9999999999) , chat_id=0)
 
 #to understand that bot is working correctly
@@ -53,41 +46,47 @@ print(bot.getMe(),'\n')
 print('Listening...\n')
 
 def handle(msg):
+    print(msg)
     global all_ques_of_type
     global my_user
     content_type, chat_type, chat_id = telepot.glance(msg)
     print('Chat Message:', content_type, chat_type, chat_id)
-    # my_user = user.user(user_name= msg['chat']['username'] , password=randint(100000000, 9999999999) , chat_id=chat_id)
 
     if(msg['text'] == '/admin'):
         entry_user_pass(telegrambotapi,chat_id)
         admin.admin.import_questions(telegrambotapi,chat_id)
 
-    if content_type == 'text':
+    elif(msg['text'] == '/import_admin'):
+        import_admin()
+
+    elif content_type == 'text':
         my_admin = admin.admin()
 
         if(msg['text'] != '/get_export'):
             my_user = my_admin.display_questions_check_answers(telegrambotapi,chat_id,msg)
 
-            # print(my_user)
 
         elif(msg['text'] == '/get_export'):
-            my_admin.get_export(my_user)
+            my_admin.get_export(telegrambotapi,msg,chat_id,my_user)
             print('=+=+=+=+=+=+=+=+=+=+')
 
-
-
-
-
+def on_callback_query(msg):
+    query_id, from_id, query_data = telepot.glance(msg, flavor='callback_query')
+    print('Callback Query:', query_id, from_id, query_data)
+    category = query_data
+    admin.admin.calculate(telegrambotapi,msg,from_id,category)
+    bot.answerCallbackQuery(query_id, text='Got it')
+    return category
 
 ########################################################################################
 ########################################################################################
 def import_admin():                                                                   ##
-    userss['id'] = '37788570'                                                         ##
-    userss['user_name'] = 'mohamad_aref'                                              ##
-    userss['password'] = '37788570bb'                                                 ##
+    superuser = {}                                                                    ##
+    superuser['id'] = config.conf['super_user_id']                                    ##
+    superuser['user_name'] = config.conf['super_user_username']                       ##
+    superuser['password'] = config.conf['super_user_password']                        ##
     try:                                                                              ##
-        database_communication.database_communication.save_user_to_db(userss)         ##
+        database_communication.database_communication.save_user_to_db(superuser)      ##
     except:                                                                           ##
         print("there is a repeated key!!!")                                           ##
 ########################################################################################
@@ -97,12 +96,12 @@ def import_admin():                                                             
 def entry_user_pass(telegrambotapi,chat_id):
     my_username = input('enter your username:')
     my_password = input('enter your password:')
-    usr = user.user(my_username,my_password,score=0,chat_id = chat_id)
+    usr = user.user(my_username,my_password,chat_id = chat_id)
     if(usr.sign_in(telegrambotapi,chat_id) == 0):
         entry_user_pass(telegrambotapi,chat_id)
 
 
-MessageLoop(bot,handle).run_as_thread()
+MessageLoop(bot,{'chat': handle,'callback_query': on_callback_query}).run_as_thread()
 
 while 1:
     time.sleep(0.05)

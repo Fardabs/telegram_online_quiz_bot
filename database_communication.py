@@ -5,16 +5,18 @@ import requests
 import pymongo
 from pymongo import *
 import pprint
+import config
 
 
 #setting the database pre-prerequirements
 class database_communication():
+
     connection_params = {
-    'user' : 'mohamad-aref',
-    'password' : '37788570b',
-    'host' : 'ds121624.mlab.com',
-    'port': 21624,
-    'namespace' : 'users'
+    'user' : config.conf['user'],
+    'password' : config.conf['password'],
+    'host' : config.conf['host'],
+    'port': int(config.conf['port']),
+    'namespace' : config.conf['namespace']
     }
 
     #the request that should be made to connect to our mongo database
@@ -78,3 +80,10 @@ class database_communication():
         if collection == "questions":
             num = cls.db.questions.count_documents(entry)
             return num
+
+
+    @classmethod
+    def update(cls,new_entry,my_query):
+        new_value = {}
+        new_value['$set'] = new_entry
+        cls.db.members.update_one(my_query,new_value)
